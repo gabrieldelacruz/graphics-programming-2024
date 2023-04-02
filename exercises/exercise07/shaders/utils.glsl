@@ -28,8 +28,8 @@ float ClampedDot(vec3 v1, vec3 v2)
 // Constructs the 3D normal using only XY values (computing implicit Z)
 vec3 GetImplicitNormal(vec2 normal)
 {
-	// (todo) 07.3: Obtain the implicit Z component of the normal
-	return vec3(0);
+	float z = sqrt(1.0f - normal.x * normal.x - normal.y * normal.y);
+	return vec3(normal, z);
 }
 
 // Obtains a position in view space using the depth buffer and the inverse projection matrix
