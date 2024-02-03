@@ -9,7 +9,7 @@
 #include <thread>
 int buildShaderProgram();
 void processInput(GLFWwindow* window);
-void updatePosition(float vertices[], size_t numVertices);
+void updatePosition(std::vector<float>& vertices);
 
 // settings
 const unsigned int SCR_WIDTH = 800;
@@ -114,8 +114,9 @@ int main()
 		vao.Bind(); // seeing as we only have a single VAO there's no need to bind it every time, but we'll do so to keep things a bit more organized
 		vbo.Bind();
 
-		//updatePosition(vertices, sizeof(vertices) / sizeof(vertices[0]) / 3);
-		//vbo.UpdateData({ reinterpret_cast<const std::byte*>(vertices), sizeof(vertices) });
+		updatePosition(circleVertices);
+		vbo.UpdateData({ reinterpret_cast<const std::byte*>(circleVertices.data()), circleVertices.size() * sizeof(float) });
+
 		glDrawElements(GL_TRIANGLES, circleIndices.size(), GL_UNSIGNED_INT, 0);
 		// glBindVertexArray(0); // no need to unbind it every time 
 
@@ -145,19 +146,26 @@ void processInput(GLFWwindow* window)
 	if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
 		glfwSetWindowShouldClose(window, true);
 }
-void updatePosition(float vertices[], size_t numVertices) {
+void updatePosition(std::vector<float>& vertices) {
 	float angle = movement * rotationSpeed;
-	// Update the VBO with the rotated vertices
-	for (size_t i = 0; i < numVertices; ++i) {
-		// Compute the rotated position of each vertex
-		float x = vertices[i * 3];
-		float y = vertices[i * 3 + 1];
-		float newX = x * cos(angle) - y * sin(angle);
-		float newY = x * sin(angle) + y * cos(angle);
+
+	// Get the center of the circle
+	float centerX = vertices[0];
+	float centerY = vertices[1];
+
+	// Update the positions of the circle vertices
+	for (size_t i = 3; i < vertices.size(); i += 3) {
+		// Compute the relative position of the current vertex with respect to the center
+		float relativeX = vertices[i] - centerX;
+		float relativeY = vertices[i + 1] - centerY;
+
+		// Compute the rotated position of each vertex around the center
+		float newX = centerX + (relativeX * cos(angle) - relativeY * sin(angle));
+		float newY = centerY + (relativeX * sin(angle) + relativeY * cos(angle));
 
 		// Update the vertex positions
-		vertices[i * 3] = newX;
-		vertices[i * 3 + 1] = newY;
+		vertices[i] = newX;
+		vertices[i + 1] = newY;
 	}
 }
 // build the shader program
