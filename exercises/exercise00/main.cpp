@@ -5,24 +5,26 @@
 #include <ituGL/geometry/VertexBufferObject.h>
 #include <ituGL/geometry/VertexAttribute.h>
 #include <ituGL/geometry/ElementBufferObject.h>
-
+#include <chrono>
+#include <thread>
 int buildShaderProgram();
 void processInput(GLFWwindow* window);
 
 // settings
 const unsigned int SCR_WIDTH = 800;
 const unsigned int SCR_HEIGHT = 800;
-
+const double FPS = 60.0;
+const double frameDelay = 1000.0 / FPS;
 int main()
 {
 	// glfw: initialize and configure
-	// ------------------------------
 	DeviceGL deviceGL;
-
 	// glfw window creation
-	// --------------------
 	Window window(SCR_WIDTH, SCR_HEIGHT, "LearnOpenGL");
-
+	double deltaTime = 0.0;
+	std::chrono::steady_clock::time_point startTime;
+	std::chrono::steady_clock::time_point endTime;
+	std::chrono::duration<double, std::milli> elapsedTime;
 
 	if (!window.IsValid())
 	{
@@ -31,7 +33,6 @@ int main()
 	}
 
 	// glad: load all OpenGL function pointers
-	// ---------------------------------------
 	deviceGL.SetCurrentWindow(window);
 	if (!deviceGL.IsReady())
 	{
@@ -40,11 +41,9 @@ int main()
 	}
 
 	// build and compile our shader program
-	// ------------------------------------
 	int shaderProgram = buildShaderProgram();
 
 	// set up vertex data (and buffer(s)) and configure vertex attributes
-	// ------------------------------------------------------------------
 	float vertices[] = {
 		-0.5f, -0.5f, 0.0f, // left  
 		 0.5f, -0.5f, 0.0f, // right 
@@ -55,12 +54,11 @@ int main()
 	VertexBufferObject vbo;
 	VertexArrayObject vao;
 	ElementBufferObject ebo;
+
 	// bind the Vertex Array Object first, then bind and set vertex buffer(s), and then configure vertex attributes(s).
 	vao.Bind();
 	vbo.Bind();
 	ebo.Bind();
-	// Create a std::span from the vertices array
-	//std::cout << sizeof(vertices) << std::endl;
 
 	unsigned int indices[] = { 0, 1, 2, 2, 0, 3 };
 	size_t indicesCount = sizeof(indices) / sizeof(unsigned int);
@@ -79,13 +77,12 @@ int main()
 
 	// uncomment this call to draw in wireframe polygons.
 	//glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-
-	float time = 0.0f;
-	float rotationSpeed = 0.1f;
+	float movement = 0.2;
+	float rotationSpeed = 0.4f;
 	// render loop
-	// -----------
 	while (!window.ShouldClose())
 	{
+		startTime = std::chrono::steady_clock::now();
 		// input
 		processInput(window.GetInternalWindow());
 		// render
@@ -95,7 +92,7 @@ int main()
 		glUseProgram(shaderProgram);
 		vao.Bind(); // seeing as we only have a single VAO there's no need to bind it every time, but we'll do so to keep things a bit more organized
 		vbo.Bind();
-		float angle = time * rotationSpeed;
+		float angle = movement * rotationSpeed;
 		// Update the VBO with the rotated vertices
 		int numVertices = sizeof(vertices) / sizeof(vertices[0]) / 3;
 		for (int i = 0; i < numVertices; ++i) {
@@ -116,25 +113,27 @@ int main()
 		// glBindVertexArray(0); // no need to unbind it every time 
 
 		// glfw: swap buffers and poll IO events (keys pressed/released, mouse moved etc.)
-		// -------------------------------------------------------------------------------
 		window.SwapBuffers();
 		deviceGL.PollEvents();
-		time += 0.1;
+
+		endTime = std::chrono::steady_clock::now();
+		elapsedTime = endTime - startTime;
+		deltaTime = elapsedTime.count();
+		if (deltaTime < frameDelay) {
+			std::this_thread::sleep_for(std::chrono::milliseconds(static_cast<int>(frameDelay - deltaTime)));
+		}
 	}
 
 	// optional: de-allocate all resources once they've outlived their purpose:
-	// ------------------------------------------------------------------------
 	//glDeleteVertexArrays(1, &VAO);
 	//glDeleteBuffers(1, &VBO);
 	glDeleteProgram(shaderProgram);
 	// glfw: terminate, clearing all previously allocated GLFW resources.
-	// ------------------------------------------------------------------
 	// This is now done in the destructor of DeviceGL
 	return 0;
 }
 
 // process all input: query GLFW whether relevant keys are pressed/released this frame and react accordingly
-// --------------------------------------------------------------------------------------------------------
 void processInput(GLFWwindow* window)
 {
 	if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
