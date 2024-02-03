@@ -46,7 +46,10 @@ int main()
 	float vertices[] = {
 		-0.5f, -0.5f, 0.0f, // left  
 		 0.5f, -0.5f, 0.0f, // right 
-		 0.0f,  0.5f, 0.0f  // top   
+		 0.5f,  0.5f, 0.0f,  // top   
+		-0.5f, 0.5f, 0.0f, // left  
+		 0.5f, 0.5f, 0.0f, // right 
+		-0.5f,  -0.5f, 0.0f  // bottom
 	};
 
 	VertexBufferObject vbo;
@@ -55,6 +58,8 @@ int main()
 	vao.Bind();
 	vbo.Bind();
 	// Create a std::span from the vertices array
+	std::cout << "-------" << std::endl;
+	std::cout << sizeof(vertices) << std::endl;
 	vbo.AllocateData({ reinterpret_cast<const std::byte*>(vertices), sizeof(vertices) });
 	VertexAttribute positionAttribute(Data::Type::Float, 3, false);
 	vao.SetAttribute(0, positionAttribute, 0, 3 * sizeof(float));
@@ -80,12 +85,12 @@ int main()
 
 		// render
 		// ------
-		deviceGL.Clear(1.0f, 1.0f, 0.0f, 1.0f);
+		deviceGL.Clear(0.2f, 0.3f, 0.3f, 1.0f);
 
 		// draw our first triangle
 		glUseProgram(shaderProgram);
 		vao.Bind(); // seeing as we only have a single VAO there's no need to bind it every time, but we'll do so to keep things a bit more organized
-		glDrawArrays(GL_TRIANGLES, 0, 3);
+		glDrawArrays(GL_TRIANGLES, 0, 6);
 		// glBindVertexArray(0); // no need to unbind it every time 
 
 		// glfw: swap buffers and poll IO events (keys pressed/released, mouse moved etc.)
@@ -107,7 +112,7 @@ int main()
 }
 
 // process all input: query GLFW whether relevant keys are pressed/released this frame and react accordingly
-// ---------------------------------------------------------------------------------------------------------
+// --------------------------------------------------------------------------------------------------------
 void processInput(GLFWwindow* window)
 {
 	if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
