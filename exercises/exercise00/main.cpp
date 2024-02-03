@@ -11,7 +11,7 @@ void processInput(GLFWwindow* window);
 
 // settings
 const unsigned int SCR_WIDTH = 800;
-const unsigned int SCR_HEIGHT = 600;
+const unsigned int SCR_HEIGHT = 800;
 
 int main()
 {
@@ -80,22 +80,38 @@ int main()
 	// uncomment this call to draw in wireframe polygons.
 	//glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 
+	float time = 0.0f;
+	float rotationSpeed = 0.1f;
 	// render loop
 	// -----------
 	while (!window.ShouldClose())
 	{
 		// input
-		// -----
 		processInput(window.GetInternalWindow());
-
 		// render
-		// ------
 		deviceGL.Clear(0.2f, 0.3f, 0.3f, 1.0f);
 
 		// draw our first triangle
 		glUseProgram(shaderProgram);
 		vao.Bind(); // seeing as we only have a single VAO there's no need to bind it every time, but we'll do so to keep things a bit more organized
-		//glDrawArrays(GL_TRIANGLES, 0, 6);
+		vbo.Bind();
+		float angle = time * rotationSpeed;
+		// Update the VBO with the rotated vertices
+		int numVertices = sizeof(vertices) / sizeof(vertices[0]) / 3;
+		for (int i = 0; i < numVertices; ++i) {
+			// Compute the rotated position of each vertex
+			float x = vertices[i * 3];
+			float y = vertices[i * 3 + 1];
+			float newX = x * cos(angle) - y * sin(angle);
+			float newY = x * sin(angle) + y * cos(angle);
+
+			// Update the vertex positions
+			vertices[i * 3] = newX;
+			vertices[i * 3 + 1] = newY;
+		}
+
+		// Update the VBO data with the rotated vertices
+		vbo.UpdateData({ reinterpret_cast<const std::byte*>(vertices), sizeof(vertices) });
 		glDrawElements(GL_TRIANGLES, indicesCount, GL_UNSIGNED_INT, 0);
 		// glBindVertexArray(0); // no need to unbind it every time 
 
@@ -103,6 +119,7 @@ int main()
 		// -------------------------------------------------------------------------------
 		window.SwapBuffers();
 		deviceGL.PollEvents();
+		time += 0.1;
 	}
 
 	// optional: de-allocate all resources once they've outlived their purpose:
@@ -110,7 +127,6 @@ int main()
 	//glDeleteVertexArrays(1, &VAO);
 	//glDeleteBuffers(1, &VBO);
 	glDeleteProgram(shaderProgram);
-
 	// glfw: terminate, clearing all previously allocated GLFW resources.
 	// ------------------------------------------------------------------
 	// This is now done in the destructor of DeviceGL
