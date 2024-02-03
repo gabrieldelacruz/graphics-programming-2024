@@ -9,12 +9,15 @@
 #include <thread>
 int buildShaderProgram();
 void processInput(GLFWwindow* window);
+void updatePosition(float vertices[], size_t numVertices);
 
 // settings
 const unsigned int SCR_WIDTH = 800;
 const unsigned int SCR_HEIGHT = 800;
 const double FPS = 60.0;
 const double frameDelay = 1000.0 / FPS;
+float movement = 0.2;
+float rotationSpeed = 0.4f;
 int main()
 {
 	// glfw: initialize and configure
@@ -43,17 +46,35 @@ int main()
 	// build and compile our shader program
 	int shaderProgram = buildShaderProgram();
 
-	// set up vertex data (and buffer(s)) and configure vertex attributes
-	float vertices[] = {
-		-0.5f, -0.5f, 0.0f, // left  
-		 0.5f, -0.5f, 0.0f, // right 
-		 0.5f,  0.5f, 0.0f,  // top   
-		-0.5f,  0.5f, 0.0f  // bottom
-	};
-
 	VertexBufferObject vbo;
 	VertexArrayObject vao;
 	ElementBufferObject ebo;
+	// set up vertex data (and buffer(s)) and configure vertex attributes
+	const float radius = 0.5f;
+	const int numSegments = 16;
+	const float segmentAngle = (2 * 3.14159) / numSegments;
+
+	// Generate vertices for the circle
+	std::vector<float> circleVertices;
+	circleVertices.push_back(0.0f); // Center vertex
+	circleVertices.push_back(0.0f);
+	circleVertices.push_back(0.0f);
+
+	for (int i = 0; i < numSegments; ++i) {
+		float x = radius * cos(i * segmentAngle);
+		float y = radius * sin(i * segmentAngle);
+		circleVertices.push_back(x);
+		circleVertices.push_back(y);
+		circleVertices.push_back(0.0f);
+	}
+
+	// Generate indices for the circle
+	std::vector<unsigned int> circleIndices;
+	for (int i = 1; i <= numSegments; ++i) {
+		circleIndices.push_back(0); // Center vertex index
+		circleIndices.push_back(i);
+		circleIndices.push_back(i % numSegments + 1);
+	}
 
 	// bind the Vertex Array Object first, then bind and set vertex buffer(s), and then configure vertex attributes(s).
 	vao.Bind();
@@ -62,8 +83,9 @@ int main()
 
 	unsigned int indices[] = { 0, 1, 2, 2, 0, 3 };
 	size_t indicesCount = sizeof(indices) / sizeof(unsigned int);
-	vbo.AllocateData({ reinterpret_cast<const std::byte*>(vertices), sizeof(vertices) });
-	ebo.AllocateData<unsigned int>({ indices, indicesCount });
+	vbo.AllocateData({ reinterpret_cast<const std::byte*>(circleVertices.data()), circleVertices.size() * sizeof(float) });
+
+	ebo.AllocateData<unsigned int>({ circleIndices.data(), circleIndices.size() });
 	VertexAttribute positionAttribute(Data::Type::Float, 3, false);
 	vao.SetAttribute(0, positionAttribute, 0, 3 * sizeof(float));
 
@@ -77,8 +99,7 @@ int main()
 
 	// uncomment this call to draw in wireframe polygons.
 	//glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-	float movement = 0.2;
-	float rotationSpeed = 0.4f;
+
 	// render loop
 	while (!window.ShouldClose())
 	{
@@ -92,24 +113,10 @@ int main()
 		glUseProgram(shaderProgram);
 		vao.Bind(); // seeing as we only have a single VAO there's no need to bind it every time, but we'll do so to keep things a bit more organized
 		vbo.Bind();
-		float angle = movement * rotationSpeed;
-		// Update the VBO with the rotated vertices
-		int numVertices = sizeof(vertices) / sizeof(vertices[0]) / 3;
-		for (int i = 0; i < numVertices; ++i) {
-			// Compute the rotated position of each vertex
-			float x = vertices[i * 3];
-			float y = vertices[i * 3 + 1];
-			float newX = x * cos(angle) - y * sin(angle);
-			float newY = x * sin(angle) + y * cos(angle);
 
-			// Update the vertex positions
-			vertices[i * 3] = newX;
-			vertices[i * 3 + 1] = newY;
-		}
-
-		// Update the VBO data with the rotated vertices
-		vbo.UpdateData({ reinterpret_cast<const std::byte*>(vertices), sizeof(vertices) });
-		glDrawElements(GL_TRIANGLES, indicesCount, GL_UNSIGNED_INT, 0);
+		//updatePosition(vertices, sizeof(vertices) / sizeof(vertices[0]) / 3);
+		//vbo.UpdateData({ reinterpret_cast<const std::byte*>(vertices), sizeof(vertices) });
+		glDrawElements(GL_TRIANGLES, circleIndices.size(), GL_UNSIGNED_INT, 0);
 		// glBindVertexArray(0); // no need to unbind it every time 
 
 		// glfw: swap buffers and poll IO events (keys pressed/released, mouse moved etc.)
@@ -128,7 +135,6 @@ int main()
 	//glDeleteVertexArrays(1, &VAO);
 	//glDeleteBuffers(1, &VBO);
 	glDeleteProgram(shaderProgram);
-	// glfw: terminate, clearing all previously allocated GLFW resources.
 	// This is now done in the destructor of DeviceGL
 	return 0;
 }
@@ -139,7 +145,21 @@ void processInput(GLFWwindow* window)
 	if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
 		glfwSetWindowShouldClose(window, true);
 }
+void updatePosition(float vertices[], size_t numVertices) {
+	float angle = movement * rotationSpeed;
+	// Update the VBO with the rotated vertices
+	for (size_t i = 0; i < numVertices; ++i) {
+		// Compute the rotated position of each vertex
+		float x = vertices[i * 3];
+		float y = vertices[i * 3 + 1];
+		float newX = x * cos(angle) - y * sin(angle);
+		float newY = x * sin(angle) + y * cos(angle);
 
+		// Update the vertex positions
+		vertices[i * 3] = newX;
+		vertices[i * 3 + 1] = newY;
+	}
+}
 // build the shader program
 // ------------------------
 int buildShaderProgram()
