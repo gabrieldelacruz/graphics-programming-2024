@@ -44,9 +44,9 @@ int main()
 
     // set up vertex data (and buffer(s)) and configure vertex attributes
     // ------------------------------------------------------------------
-    const int sides = 16;
+    const int sides = 6;
     const float pi = 3.1416f;
-    const float length = 0.5f * std::sqrt(2);
+    const float length = 0.5f * std::sqrt(2);  // JERR - Lenght from center to vertex
 
     // Using std::array instead of regular arrays makes sure we don't access out of range
     std::array<float, 3 * (sides + 1)> vertices;
@@ -64,6 +64,7 @@ int main()
         vertices[3 * i + 4] = std::cos(angle) * length;
         vertices[3 * i + 5] = 0.0f;
 
+        // JERR - 0, 1, 2,  0, 2, 3, etc. with each number corrosponding to a vertex (group of 3 floats) in the above
         indices[3 * i + 0] = 0;
         indices[3 * i + 1] = i + 1;
         indices[3 * i + 2] = i + 2;
@@ -86,7 +87,7 @@ int main()
     ebo.AllocateData<unsigned int>(std::span(indices));
 
     VertexAttribute position(Data::Type::Float, 3);
-    vao.SetAttribute(0, position, 0);
+    vao.SetAttribute(0, position, 0);  // JERR - This call claims (registeres) the VBO, making it safe to uinbind afterwards
 
     // note that this is allowed, the call to glVertexAttribPointer registered VBO as the vertex attribute's bound vertex buffer object so afterwards we can safely unbind
     VertexBufferObject::Unbind();
@@ -95,12 +96,13 @@ int main()
     // VAOs requires a call to glBindVertexArray anyways so we generally don't unbind VAOs (nor VBOs) when it's not directly necessary.
     VertexArrayObject::Unbind();
 
-    // Now we can unbind the EBO as well
+    // JERR - The EBO has to wait with unbinding till after the VAO, cause otherwise the VAO just doesn't use it
     ElementBufferObject::Unbind();
 
     // uncomment this call to draw in wireframe polygons.
     //glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 
+    float pseudo_time = 0.0f;
     // render loop
     // -----------
     while (!window.ShouldClose())
@@ -109,6 +111,19 @@ int main()
         // -----
         processInput(window.GetInternalWindow());
 
+        // JERR - update/rotate
+        // -----
+        vbo.Bind();
+        for (int i = 0; i < sides; ++i)
+        {
+            float angle = (i * deltaAngle) + pseudo_time;
+            vertices[3 * i + 3] = std::sin(angle) * length;
+            vertices[3 * i + 4] = std::cos(angle) * length;
+            vertices[3 * i + 5] = 0.0f;
+        }
+        vbo.UpdateData<float>(std::span(vertices), 0);
+        pseudo_time += 0.0001;
+
         // render
         // ------
         deviceGL.Clear(0.2f, 0.3f, 0.3f, 1.0f);
@@ -116,7 +131,6 @@ int main()
         // draw our first triangle
         glUseProgram(shaderProgram);
         vao.Bind(); // seeing as we only have a single VAO there's no need to bind it every time, but we'll do so to keep things a bit more organized
-        //glDrawArrays(GL_TRIANGLES, 0, vertexCount);
         glDrawElements(GL_TRIANGLES, indices.size(), GL_UNSIGNED_INT, 0);
         // VertexArrayObject::Unbind(); // no need to unbind it every time 
 
