@@ -6,6 +6,7 @@
 #include <ituGL/geometry/ElementBufferObject.h>
 #include <iostream>
 #include <array>
+#include <cmath>
 
 int buildShaderProgram();
 void processInput(GLFWwindow* window);
