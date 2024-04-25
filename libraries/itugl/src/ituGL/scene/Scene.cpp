@@ -29,6 +29,7 @@ std::shared_ptr<SceneNode> Scene::GetSceneNode(const std::string& name) const
 bool Scene::AddSceneNode(std::shared_ptr<SceneNode> node)
 {
     assert(node);
+    assert(m_nodes.find(node->GetName()) == m_nodes.end());
     m_nodes[node->GetName()] = node;
     node->SetOwnerScene(this);
     return true;

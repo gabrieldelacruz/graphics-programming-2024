@@ -78,13 +78,33 @@ public:
     void GetStencilBackOperations(StencilOperation& stencilFail, StencilOperation& depthFail, StencilOperation& depthPass) const;
     void SetStencilBackOperations(StencilOperation stencilFail, StencilOperation depthFail, StencilOperation depthPass);
 
-    // Set the same blend equation for color and alpha. By default and most common: Add
+
+    // Returns true if the material has any blending (BlendEquation != None)
+    bool HasBlend() const;
+
+    // Get the blend equation for color
     BlendEquation GetBlendEquationColor() const;
+
+    // Get the blend equation for alpha
     BlendEquation GetBlendEquationAlpha() const;
+
+    // Set the same blend equation for color and alpha. By default and most common: Add
     void SetBlendEquation(BlendEquation blendEquation);
 
     // Set separate blend equation for color and alpha. By default and most common: Add
     void SetBlendEquation(BlendEquation blendEquationColor, BlendEquation blendEquationAlpha);
+
+    // Get the source color parameter for the blend equation
+    BlendParam GetBlendParamSourceColor() const;
+
+    // Get the source alpha parameter for the blend equation
+    BlendParam GetBlendParamSourceAlpha() const;
+
+    // Get the destination color parameter for the blend equation
+    BlendParam GetBlendParamDestColor() const;
+
+    // Get the destination alpha parameter for the blend equation
+    BlendParam GetBlendParamDestAlpha() const;
 
     // Set the parameters for the blend equation, same for color and alpha
     void SetBlendParams(BlendParam source, BlendParam dest);

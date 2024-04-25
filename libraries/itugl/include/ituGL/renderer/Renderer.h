@@ -4,6 +4,7 @@
 #include <ituGL/renderer/RenderPass.h>
 #include <ituGL/geometry/Drawcall.h>
 #include <ituGL/geometry/Mesh.h>
+#include <ituGL/shader/Material.h>
 #include <glm/mat4x4.hpp>
 #include <vector>
 #include <unordered_map>
@@ -36,7 +37,12 @@ public:
         const Drawcall& drawcall;
     };
 
-    using DrawcallCollection = std::vector<DrawcallInfo>;
+    using DrawcallSupportedFunction = std::function<bool(const DrawcallInfo& drawcallInfo)>;
+    struct DrawcallCollection
+    {
+        DrawcallSupportedFunction isSupported;
+        std::vector<DrawcallInfo> drawcallInfos;
+    };
 
     using UpdateTransformsFunction = std::function<void(const ShaderProgram&, const glm::mat4&, const Camera&, bool)>;
     using UpdateLightsFunction = std::function<bool(const ShaderProgram&, std::span<const Light* const>, unsigned int&)>;
@@ -63,6 +69,9 @@ public:
     std::span<const DrawcallInfo> GetDrawcalls(unsigned int collectionIndex) const;
     void AddModel(const Model& model, const glm::mat4& worldMatrix);
 
+    unsigned int AddDrawcallCollection(const DrawcallSupportedFunction &drawcallSupportedFunction);
+    void SetDrawcallCollectionSupportedFunction(unsigned int index, const DrawcallSupportedFunction& drawcallSupportedFunction);
+
     const Mesh& GetFullscreenMesh() const;
 
     void RegisterShaderProgram(std::shared_ptr<const ShaderProgram> shaderProgramPtr,
@@ -75,7 +84,7 @@ public:
     UpdateLightsFunction GetDefaultUpdateLightsFunction(const ShaderProgram& shaderProgram);
     bool UpdateLights(std::shared_ptr<const ShaderProgram> shaderProgramPtr, std::span<const Light* const> lights, unsigned int& lightIndex) const;
 
-    void PrepareDrawcall(const DrawcallInfo& drawcallInfo);
+    void PrepareDrawcall(const DrawcallInfo& drawcallInfo, Material::OverrideFlags materialOverride = Material::NoOverride);
 
     void SetLightingRenderStates(bool firstPass);
 

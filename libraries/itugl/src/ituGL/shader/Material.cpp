@@ -114,6 +114,11 @@ void Material::SetStencilBackOperations(StencilOperation stencilFail, StencilOpe
     m_stencilDepthPass[1] = depthPass;
 }
 
+bool Material::HasBlend() const
+{
+    return m_blendEquations[0] != BlendEquation::None || m_blendEquations[1] != BlendEquation::None;
+}
+
 Material::BlendEquation Material::GetBlendEquationColor() const
 {
     return m_blendEquations[0];
@@ -133,6 +138,26 @@ void Material::SetBlendEquation(BlendEquation blendEquationColor, BlendEquation 
 {
     m_blendEquations[0] = blendEquationColor;
     m_blendEquations[1] = blendEquationAlpha;
+}
+
+Material::BlendParam Material::GetBlendParamSourceColor() const
+{
+    return m_blendParams[0];
+}
+
+Material::BlendParam Material::GetBlendParamSourceAlpha() const
+{
+    return m_blendParams[2];
+}
+
+Material::BlendParam Material::GetBlendParamDestColor() const
+{
+    return m_blendParams[1];
+}
+
+Material::BlendParam Material::GetBlendParamDestAlpha() const
+{
+    return m_blendParams[3];
 }
 
 void Material::SetBlendParams(BlendParam source, BlendParam dest)
@@ -246,7 +271,7 @@ void Material::UseStencilTest() const
 void Material::UseBlend() const
 {
     // If the blend equation is None for color and alpha, do nothing
-    bool blending = m_blendEquations[0] != BlendEquation::None || m_blendEquations[1] != BlendEquation::None;
+    bool blending = HasBlend();
     DeviceGL::GetInstance().SetFeatureEnabled(GL_BLEND, blending);
     if (blending)
     {

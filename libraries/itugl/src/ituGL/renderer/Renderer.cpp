@@ -1,6 +1,5 @@
 #include <ituGL/renderer/Renderer.h>
 
-#include <ituGL/shader/Material.h>
 #include <ituGL/geometry/VertexFormat.h>
 #include <ituGL/geometry/VertexArrayObject.h>
 #include <ituGL/geometry/Drawcall.h>
@@ -88,7 +87,7 @@ void Renderer::Reset()
 
     for (auto& collection : m_drawcallCollections)
     {
-        collection.clear();
+        collection.drawcallInfos.clear();
     }
 
     m_currentCamera = nullptr;
@@ -193,7 +192,7 @@ void Renderer::AddLight(const Light& light)
 
 std::span<const Renderer::DrawcallInfo> Renderer::GetDrawcalls(unsigned int collectionIndex) const
 {
-    return m_drawcallCollections[collectionIndex];
+    return m_drawcallCollections[collectionIndex].drawcallInfos;
 }
 
 void Renderer::AddModel(const Model& model, const glm::mat4& worldMatrix)
@@ -209,19 +208,36 @@ void Renderer::AddModel(const Model& model, const glm::mat4& worldMatrix)
 
         for (DrawcallCollection& collection : m_drawcallCollections)
         {
-            collection.push_back(drawcallInfo);
+            if (!collection.isSupported || collection.isSupported(drawcallInfo))
+            {
+                collection.drawcallInfos.push_back(drawcallInfo);
+            }
         }
     }
 }
 
-void Renderer::PrepareDrawcall(const DrawcallInfo& drawcallInfo)
+unsigned int Renderer::AddDrawcallCollection(const DrawcallSupportedFunction& drawcallSupportedFunction)
+{
+    DrawcallCollection drawcallCollection;
+    drawcallCollection.isSupported = drawcallSupportedFunction;
+    unsigned int index = static_cast<unsigned int>(m_drawcallCollections.size());
+    m_drawcallCollections.push_back(drawcallCollection);
+    return index;
+}
+
+void Renderer::SetDrawcallCollectionSupportedFunction(unsigned int index, const DrawcallSupportedFunction& drawcallSupportedFunction)
+{
+    m_drawcallCollections[index].isSupported = drawcallSupportedFunction;
+}
+
+void Renderer::PrepareDrawcall(const DrawcallInfo& drawcallInfo, Material::OverrideFlags materialOverride)
 {
     std::shared_ptr<const ShaderProgram> shaderProgram = drawcallInfo.material.GetShaderProgram();
 
     // TODO: Room for optimization here, caching current material, current worldMatrixIndex and current VAO
 
     // Setup material
-    drawcallInfo.material.Use();
+    drawcallInfo.material.Use(materialOverride);
 
     // Setup world matrix
     // Setup camera
@@ -234,10 +250,12 @@ void Renderer::PrepareDrawcall(const DrawcallInfo& drawcallInfo)
 void Renderer::SetLightingRenderStates(bool firstPass)
 {
     // Set the render states for the first and additional lights
-    m_device.SetFeatureEnabled(GL_BLEND, !firstPass);
-    // TODO: This should not be hardcoded here
-    glDepthFunc(firstPass ? GL_LESS : GL_EQUAL);
-    glBlendFunc(GL_ONE, GL_ONE);
+    if (!firstPass)
+    {
+        m_device.SetFeatureEnabled(GL_BLEND, true);
+        glDepthFunc(firstPass ? GL_LESS : GL_EQUAL);
+        glBlendFunc(GL_ONE, GL_ONE);
+    }
 }
 
 void Renderer::InitializeFullscreenMesh()
