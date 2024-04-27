@@ -39,6 +39,7 @@ PostFXSceneViewerApplication::PostFXSceneViewerApplication()
     , m_blurIterations(1)
     , m_bloomRange(1.0f, 2.0f)
     , m_bloomIntensity(1.0f)
+    , m_transparentCollection(0)
 {
 }
 
@@ -66,6 +67,10 @@ void PostFXSceneViewerApplication::Update()
     // Add the scene nodes to the renderer
     RendererSceneVisitor rendererSceneVisitor(m_renderer);
     m_scene.AcceptVisitor(rendererSceneVisitor);
+
+    // Sort transparent pass
+    using namespace std::placeholders;
+    m_renderer.SortDrawcallCollection(m_transparentCollection, std::bind(&Renderer::IsBackToFront, &m_renderer, _1, _2));
 }
 
 void PostFXSceneViewerApplication::Render()
@@ -267,7 +272,7 @@ void PostFXSceneViewerApplication::InitializeMaterials()
         // Create material
         m_forwardMaterial = std::make_shared<Material>(shaderProgramPtr, filteredUniforms);
         m_forwardMaterial->SetBlendEquation(Material::BlendEquation::Add);
-        m_forwardMaterial->SetBlendParams(Material::BlendParam::SourceAlpha, Material::BlendParam::One);
+        m_forwardMaterial->SetBlendParams(Material::BlendParam::SourceAlpha, Material::BlendParam::OneMinusSourceAlpha);
         m_forwardMaterial->SetDepthWrite(false);
     }
 }
@@ -401,7 +406,7 @@ void PostFXSceneViewerApplication::InitializeRenderer()
     m_renderer.SetDrawcallCollectionSupportedFunction(0, IsOpaque);
 
     // Add another collection for transparent objects
-    unsigned int transparentCollection = m_renderer.AddDrawcallCollection(IsTransparent);
+    m_transparentCollection = m_renderer.AddDrawcallCollection(IsTransparent);
 
     // Set up deferred passes
     {
@@ -427,7 +432,7 @@ void PostFXSceneViewerApplication::InitializeRenderer()
     // Skybox pass
     m_renderer.AddRenderPass(std::make_unique<SkyboxRenderPass>(m_skyboxTexture));
 
-    m_renderer.AddRenderPass(std::make_unique<ForwardRenderPass>(transparentCollection));
+    m_renderer.AddRenderPass(std::make_unique<ForwardRenderPass>(m_transparentCollection));
 
     // Create a copy pass from m_sceneTexture to the first temporary texture
     std::shared_ptr<Material> copyMaterial = CreatePostFXMaterial("shaders/postfx/copy.frag", m_sceneTexture);

@@ -80,4 +80,7 @@ private:
     int m_blurIterations;
     glm::vec2 m_bloomRange;
     float m_bloomIntensity;
+
+    // Drawcall collections
+    unsigned int m_transparentCollection;
 };
