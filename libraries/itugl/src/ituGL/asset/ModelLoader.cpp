@@ -171,7 +171,7 @@ std::shared_ptr<Material> ModelLoader::GenerateMaterial(const aiMaterial& materi
             }
             break;
         case MaterialProperty::DiffuseTexture:
-            LoadTexture(materialData, aiTextureType_DIFFUSE, *material, location, TextureObject::FormatRGB, TextureObject::InternalFormatSRGB8);
+            LoadTexture(materialData, aiTextureType_DIFFUSE, *material, location, TextureObject::FormatRGBA, TextureObject::InternalFormatSRGBA8);
             break;
         case MaterialProperty::NormalTexture:
             LoadTexture(materialData, aiTextureType_NORMALS, *material, location, TextureObject::FormatRGB, TextureObject::InternalFormatRGB8);
