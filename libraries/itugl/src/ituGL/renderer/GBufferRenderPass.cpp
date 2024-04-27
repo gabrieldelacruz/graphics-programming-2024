@@ -93,15 +93,16 @@ void GBufferRenderPass::Render()
     // for all drawcalls
     for (const Renderer::DrawcallInfo& drawcallInfo : drawcallCollection)
     {
-        assert(drawcallInfo.material.GetBlendEquationColor() == Material::BlendEquation::None);
-        assert(drawcallInfo.material.GetBlendEquationAlpha() == Material::BlendEquation::None);
-        assert(drawcallInfo.material.GetDepthWrite());
+        const Material& material = drawcallInfo.GetMaterial();
+        assert(material.GetBlendEquationColor() == Material::BlendEquation::None);
+        assert(material.GetBlendEquationAlpha() == Material::BlendEquation::None);
+        assert(material.GetDepthWrite());
 
         // Prepare drawcall (similar to forward)
         renderer.PrepareDrawcall(drawcallInfo);
 
         // Render drawcall
-        drawcallInfo.drawcall.Draw();
+        drawcallInfo.GetDrawcall().Draw();
     }
 
     renderer.GetDevice().SetFeatureEnabled(GL_FRAMEBUFFER_SRGB, wasSRGB);

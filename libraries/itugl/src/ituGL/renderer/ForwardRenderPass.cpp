@@ -29,7 +29,7 @@ void ForwardRenderPass::Render()
         // Prepare drawcall states
         renderer.PrepareDrawcall(drawcallInfo);
 
-        std::shared_ptr<const ShaderProgram> shaderProgram = drawcallInfo.material.GetShaderProgram();
+        std::shared_ptr<const ShaderProgram> shaderProgram = drawcallInfo.GetMaterial().GetShaderProgram();
 
         //for all lights
         bool first = true;
@@ -40,7 +40,7 @@ void ForwardRenderPass::Render()
             renderer.SetLightingRenderStates(first);
 
             // Draw
-            drawcallInfo.drawcall.Draw();
+            drawcallInfo.GetDrawcall().Draw();
 
             first = false;
         }

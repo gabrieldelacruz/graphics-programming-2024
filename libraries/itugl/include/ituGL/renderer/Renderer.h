@@ -24,25 +24,44 @@ class FramebufferObject;
 class Renderer
 {
 public:
-    struct DrawcallInfo
+    class DrawcallInfo
     {
-        DrawcallInfo(const Material& material, unsigned int worldMatrixIndex, const VertexArrayObject& vao, const Drawcall& drawcall)
-            : material(material), worldMatrixIndex(worldMatrixIndex), vao(vao), drawcall(drawcall)
-        {
-        }
+    public:
+        DrawcallInfo(const Material& material, unsigned int worldMatrixIndex, const VertexArrayObject& vao, const Drawcall& drawcall);
 
-        const Material& material;
-        unsigned int worldMatrixIndex;
-        const VertexArrayObject& vao;
-        const Drawcall& drawcall;
+        const Material& GetMaterial() const { return m_material; }
+        unsigned int GetWorldMatrixIndex() const { return m_worldMatrixIndex; }
+        const VertexArrayObject& GetVAO() const { return m_vao; }
+        const Drawcall& GetDrawcall() const { return m_drawcall; }
+
+    private:
+        std::reference_wrapper<const Material> m_material;
+        unsigned int m_worldMatrixIndex;
+        std::reference_wrapper<const VertexArrayObject> m_vao;
+        std::reference_wrapper<const Drawcall> m_drawcall;
     };
 
     using DrawcallSupportedFunction = std::function<bool(const DrawcallInfo& drawcallInfo)>;
-    struct DrawcallCollection
+    class DrawcallCollection
     {
-        DrawcallSupportedFunction isSupported;
-        std::vector<DrawcallInfo> drawcallInfos;
+    public:
+        DrawcallCollection(const DrawcallSupportedFunction &isSupported = nullptr);
+
+        bool IsSupported(const DrawcallInfo& drawcallInfo) const;
+        void SetSupportedFunction(const DrawcallSupportedFunction& isSupported);
+
+        std::span<DrawcallInfo> GetDrawcalls() { return m_drawcallInfos; }
+        std::span<const DrawcallInfo> GetDrawcalls() const { return m_drawcallInfos; }
+
+        void AddDrawcall(const DrawcallInfo& drawcallInfo);
+        void Clear();
+
+    private:
+        DrawcallSupportedFunction m_isSupported;
+        std::vector<DrawcallInfo> m_drawcallInfos;
     };
+
+    using DrawcallSortFunction = std::function<bool(const DrawcallInfo&, const DrawcallInfo&)>;
 
     using UpdateTransformsFunction = std::function<void(const ShaderProgram&, const glm::mat4&, const Camera&, bool)>;
     using UpdateLightsFunction = std::function<bool(const ShaderProgram&, std::span<const Light* const>, unsigned int&)>;
@@ -72,6 +91,10 @@ public:
     unsigned int AddDrawcallCollection(const DrawcallSupportedFunction &drawcallSupportedFunction);
     void SetDrawcallCollectionSupportedFunction(unsigned int index, const DrawcallSupportedFunction& drawcallSupportedFunction);
 
+    void SortDrawcallCollection(unsigned int index, const DrawcallSortFunction& drawcallSortFunction);
+    bool IsBackToFront(const DrawcallInfo& a, const DrawcallInfo& b) const;
+    bool IsFrontToBack(const DrawcallInfo& a, const DrawcallInfo& b) const;
+
     const Mesh& GetFullscreenMesh() const;
 
     void RegisterShaderProgram(std::shared_ptr<const ShaderProgram> shaderProgramPtr,
@@ -94,6 +117,8 @@ private:
     void Reset();
 
     void InitializeFullscreenMesh();
+
+    const glm::mat4& GetWorldMatrix(const DrawcallInfo& drawcallInfo) const;
 
 private:
     DeviceGL& m_device;
