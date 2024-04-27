@@ -19,9 +19,11 @@
 #include <ituGL/renderer/SkyboxRenderPass.h>
 #include <ituGL/renderer/GBufferRenderPass.h>
 #include <ituGL/renderer/DeferredRenderPass.h>
+#include <ituGL/renderer/ForwardRenderPass.h>
 #include <ituGL/renderer/PostFXRenderPass.h>
 #include <ituGL/scene/RendererSceneVisitor.h>
 
+#include <ituGL/scene/Transform.h>
 #include <ituGL/scene/ImGuiSceneVisitor.h>
 #include <imgui.h>
 
@@ -95,7 +97,7 @@ void PostFXSceneViewerApplication::InitializeCamera()
     camera->SetPerspectiveProjectionMatrix(1.0f, 1.0f, 0.1f, 100.0f);
 
     // Create a scene node for the camera
-    std::shared_ptr<SceneCamera> sceneCamera = std::make_shared<SceneCamera>("camera", camera);
+    std::shared_ptr<SceneCamera> sceneCamera = std::make_shared<SceneCamera>("main camera", camera);
 
     // Add the camera node to the scene
     m_scene.AddSceneNode(sceneCamera);
@@ -158,8 +160,8 @@ void PostFXSceneViewerApplication::InitializeMaterials()
         filteredUniforms.insert("WorldViewProjMatrix");
 
         // Create material
-        m_defaultMaterial = std::make_shared<Material>(shaderProgramPtr, filteredUniforms);
-        m_defaultMaterial->SetUniformValue("Color", glm::vec3(1.0f));
+        m_gbufferMaterial = std::make_shared<Material>(shaderProgramPtr, filteredUniforms);
+        m_gbufferMaterial->SetUniformValue("Color", glm::vec3(1.0f));
     }
 
     // Deferred material
@@ -213,6 +215,61 @@ void PostFXSceneViewerApplication::InitializeMaterials()
         // Create material
         m_deferredMaterial = std::make_shared<Material>(shaderProgramPtr, filteredUniforms);
     }
+
+    // Forward material
+    {
+        std::vector<const char*> vertexShaderPaths;
+        vertexShaderPaths.push_back("shaders/version330.glsl");
+        vertexShaderPaths.push_back("shaders/renderer/forward.vert");
+        Shader vertexShader = ShaderLoader(Shader::VertexShader).Load(vertexShaderPaths);
+
+        std::vector<const char*> fragmentShaderPaths;
+        fragmentShaderPaths.push_back("shaders/version330.glsl");
+        fragmentShaderPaths.push_back("shaders/utils.glsl");
+        fragmentShaderPaths.push_back("shaders/lambert-ggx.glsl");
+        fragmentShaderPaths.push_back("shaders/lighting.glsl");
+        fragmentShaderPaths.push_back("shaders/renderer/forward.frag");
+        Shader fragmentShader = ShaderLoader(Shader::FragmentShader).Load(fragmentShaderPaths);
+
+        std::shared_ptr<ShaderProgram> shaderProgramPtr = std::make_shared<ShaderProgram>();
+        shaderProgramPtr->Build(vertexShader, fragmentShader);
+
+        // Get transform related uniform locations
+        ShaderProgram::Location cameraPositionLocation = shaderProgramPtr->GetUniformLocation("CameraPosition");
+        ShaderProgram::Location worldMatrixLocation = shaderProgramPtr->GetUniformLocation("WorldMatrix");
+        ShaderProgram::Location viewProjMatrixLocation = shaderProgramPtr->GetUniformLocation("ViewProjMatrix");
+
+        // Register shader with renderer
+        m_renderer.RegisterShaderProgram(shaderProgramPtr,
+            [=](const ShaderProgram& shaderProgram, const glm::mat4& worldMatrix, const Camera& camera, bool cameraChanged)
+            {
+                if (cameraChanged)
+                {
+                    shaderProgram.SetUniform(cameraPositionLocation, camera.ExtractTranslation());
+                    shaderProgram.SetUniform(viewProjMatrixLocation, camera.GetViewProjectionMatrix());
+                }
+                shaderProgram.SetUniform(worldMatrixLocation, worldMatrix);
+            },
+            m_renderer.GetDefaultUpdateLightsFunction(*shaderProgramPtr)
+        );
+
+        // Filter out uniforms that are not material properties
+        ShaderUniformCollection::NameSet filteredUniforms;
+        filteredUniforms.insert("CameraPosition");
+        filteredUniforms.insert("WorldMatrix");
+        filteredUniforms.insert("ViewProjMatrix");
+        filteredUniforms.insert("LightIndirect");
+        filteredUniforms.insert("LightColor");
+        filteredUniforms.insert("LightPosition");
+        filteredUniforms.insert("LightDirection");
+        filteredUniforms.insert("LightAttenuation");
+
+        // Create material
+        m_forwardMaterial = std::make_shared<Material>(shaderProgramPtr, filteredUniforms);
+        m_forwardMaterial->SetBlendEquation(Material::BlendEquation::Add);
+        m_forwardMaterial->SetBlendParams(Material::BlendParam::SourceAlpha, Material::BlendParam::One);
+        m_forwardMaterial->SetDepthWrite(false);
+    }
 }
 
 void PostFXSceneViewerApplication::InitializeModels()
@@ -228,8 +285,11 @@ void PostFXSceneViewerApplication::InitializeModels()
     m_deferredMaterial->SetUniformValue("EnvironmentTexture", m_skyboxTexture);
     m_deferredMaterial->SetUniformValue("EnvironmentMaxLod", maxLod);
 
+    m_forwardMaterial->SetUniformValue("EnvironmentTexture", m_skyboxTexture);
+    m_forwardMaterial->SetUniformValue("EnvironmentMaxLod", maxLod);
+
     // Configure loader
-    ModelLoader loader(m_defaultMaterial);
+    ModelLoader loader(m_gbufferMaterial);
 
     // Create a new material copy for each submaterial
     loader.SetCreateMaterials(true);
@@ -253,7 +313,44 @@ void PostFXSceneViewerApplication::InitializeModels()
     // Load models
     std::shared_ptr<Model> cannonModel = loader.LoadShared("models/cannon/cannon.obj");
     m_scene.AddSceneNode(std::make_shared<SceneModel>("cannon", cannonModel));
-}
+
+    // Configure loader
+    ModelLoader forwardLoader(m_forwardMaterial);
+
+    // Create a new material copy for each submaterial
+    forwardLoader.SetCreateMaterials(true);
+
+    // Flip vertically textures loaded by the model loader
+    forwardLoader.GetTexture2DLoader().SetFlipVertical(true);
+
+    // Link vertex properties to attributes
+    forwardLoader.SetMaterialAttribute(VertexAttribute::Semantic::Position, "VertexPosition");
+    forwardLoader.SetMaterialAttribute(VertexAttribute::Semantic::Normal, "VertexNormal");
+    forwardLoader.SetMaterialAttribute(VertexAttribute::Semantic::Tangent, "VertexTangent");
+    forwardLoader.SetMaterialAttribute(VertexAttribute::Semantic::Bitangent, "VertexBitangent");
+    forwardLoader.SetMaterialAttribute(VertexAttribute::Semantic::TexCoord0, "VertexTexCoord");
+
+    // Link material properties to uniforms
+    forwardLoader.SetMaterialProperty(ModelLoader::MaterialProperty::DiffuseColor, "Color");
+    forwardLoader.SetMaterialProperty(ModelLoader::MaterialProperty::DiffuseTexture, "ColorTexture");
+    forwardLoader.SetMaterialProperty(ModelLoader::MaterialProperty::NormalTexture, "NormalTexture");
+    forwardLoader.SetMaterialProperty(ModelLoader::MaterialProperty::SpecularTexture, "SpecularTexture");
+
+    int sphereIndex = 0;
+    glm::vec2 sphereDistance(3.0f, 3.0f);
+    std::shared_ptr<Model> sphereModel = forwardLoader.LoadShared("models/sphere/sphere.obj");
+    for (int j = -2; j <= 2; ++j)
+    {
+        for (int i = -2; i <= 2; ++i)
+        {
+            std::string name("sphere ");
+            name += std::to_string(sphereIndex++);
+            std::shared_ptr<SceneModel> sceneModel = std::make_shared<SceneModel>(name, sphereModel);
+            sceneModel->GetTransform()->SetTranslation(glm::vec3(i * sphereDistance.x, 0.0f, j * sphereDistance.y));
+            m_scene.AddSceneNode(sceneModel);
+        }
+    }
+ }
 
 void PostFXSceneViewerApplication::InitializeFramebuffers()
 {
@@ -300,6 +397,12 @@ void PostFXSceneViewerApplication::InitializeRenderer()
     int width, height;
     GetMainWindow().GetDimensions(width, height);
 
+    //Default collection is opaque only
+    m_renderer.SetDrawcallCollectionSupportedFunction(0, IsOpaque);
+
+    // Add another collection for transparent objects
+    unsigned int transparentCollection = m_renderer.AddDrawcallCollection(IsTransparent);
+
     // Set up deferred passes
     {
         std::unique_ptr<GBufferRenderPass> gbufferRenderPass(std::make_unique<GBufferRenderPass>(width, height));
@@ -323,6 +426,8 @@ void PostFXSceneViewerApplication::InitializeRenderer()
 
     // Skybox pass
     m_renderer.AddRenderPass(std::make_unique<SkyboxRenderPass>(m_skyboxTexture));
+
+    m_renderer.AddRenderPass(std::make_unique<ForwardRenderPass>(transparentCollection));
 
     // Create a copy pass from m_sceneTexture to the first temporary texture
     std::shared_ptr<Material> copyMaterial = CreatePostFXMaterial("shaders/postfx/copy.frag", m_sceneTexture);
@@ -459,4 +564,14 @@ void PostFXSceneViewerApplication::RenderGUI()
     }
 
     m_imGui.EndFrame();
+}
+
+bool PostFXSceneViewerApplication::IsOpaque(const Renderer::DrawcallInfo& drawcallInfo)
+{
+    return !IsTransparent(drawcallInfo);
+}
+
+bool PostFXSceneViewerApplication::IsTransparent(const Renderer::DrawcallInfo& drawcallInfo)
+{
+    return drawcallInfo.GetMaterial().HasBlend();
 }

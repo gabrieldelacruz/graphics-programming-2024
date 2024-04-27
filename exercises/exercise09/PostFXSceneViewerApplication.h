@@ -38,6 +38,9 @@ private:
 
     void RenderGUI();
 
+    static bool IsOpaque(const Renderer::DrawcallInfo& drawcallInfo);
+    static bool IsTransparent(const Renderer::DrawcallInfo& drawcallInfo);
+
 private:
     // Helper object for debug GUI
     DearImGui m_imGui;
@@ -55,8 +58,9 @@ private:
     std::shared_ptr<TextureCubemapObject> m_skyboxTexture;
 
     // Materials
-    std::shared_ptr<Material> m_defaultMaterial;
+    std::shared_ptr<Material> m_gbufferMaterial;
     std::shared_ptr<Material> m_deferredMaterial;
+    std::shared_ptr<Material> m_forwardMaterial;
     std::shared_ptr<Material> m_composeMaterial;
     std::shared_ptr<Material> m_bloomMaterial;
 
