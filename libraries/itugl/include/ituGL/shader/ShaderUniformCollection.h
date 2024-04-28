@@ -225,7 +225,7 @@ inline void ShaderUniformCollection::GetUniformValue(const char* name, T& value)
 template<typename T>
 inline void ShaderUniformCollection::GetUniformValue(ShaderProgram::Location location, T& value) const
 {
-    GetUniformValue(location, std::span(&value, 1));
+    GetUniformValues(location, std::span(&value, 1));
 }
 
 template<typename T>
