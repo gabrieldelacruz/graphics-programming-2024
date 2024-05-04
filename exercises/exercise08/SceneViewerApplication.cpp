@@ -16,8 +16,11 @@
 #include <ituGL/geometry/Model.h>
 #include <ituGL/scene/SceneModel.h>
 
+#include <ituGL/scene/Transform.h>
+
 #include <ituGL/renderer/SkyboxRenderPass.h>
 #include <ituGL/renderer/ForwardRenderPass.h>
+#include <ituGL/renderer/ShadowMapRenderPass.h>
 #include <ituGL/scene/RendererSceneVisitor.h>
 
 #include <ituGL/scene/ImGuiSceneVisitor.h>
@@ -101,6 +104,10 @@ void SceneViewerApplication::InitializeLights()
     directionalLight->SetIntensity(3.0f);
     m_scene.AddSceneNode(std::make_shared<SceneLight>("directional light", directionalLight));
 
+    // Set direcional light as main light
+    m_mainLight = directionalLight;
+
+
     // Create a point light and add it to the scene
     //std::shared_ptr<PointLight> pointLight = std::make_shared<PointLight>();
     //pointLight->SetPosition(glm::vec3(0, 0, 0));
@@ -110,6 +117,43 @@ void SceneViewerApplication::InitializeLights()
 
 void SceneViewerApplication::InitializeMaterial()
 {
+    // Shadow map material
+    {
+        // Load and build shader
+        std::vector<const char*> vertexShaderPaths;
+        vertexShaderPaths.push_back("shaders/version330.glsl");
+        vertexShaderPaths.push_back("shaders/renderer/empty.vert");
+        Shader vertexShader = ShaderLoader(Shader::VertexShader).Load(vertexShaderPaths);
+
+        std::vector<const char*> fragmentShaderPaths;
+        fragmentShaderPaths.push_back("shaders/version330.glsl");
+        fragmentShaderPaths.push_back("shaders/renderer/empty.frag");
+        Shader fragmentShader = ShaderLoader(Shader::FragmentShader).Load(fragmentShaderPaths);
+
+        std::shared_ptr<ShaderProgram> shaderProgramPtr = std::make_shared<ShaderProgram>();
+        shaderProgramPtr->Build(vertexShader, fragmentShader);
+
+        // Get transform related uniform locations
+        ShaderProgram::Location worldViewProjMatrixLocation = shaderProgramPtr->GetUniformLocation("WorldViewProjMatrix");
+
+        // Register shader with renderer
+        m_renderer.RegisterShaderProgram(shaderProgramPtr,
+            [=](const ShaderProgram& shaderProgram, const glm::mat4& worldMatrix, const Camera& camera, bool cameraChanged)
+            {
+                shaderProgram.SetUniform(worldViewProjMatrixLocation, camera.GetViewProjectionMatrix() * worldMatrix);
+            },
+            nullptr
+        );
+
+        // Filter out uniforms that are not material properties
+        ShaderUniformCollection::NameSet filteredUniforms;
+        filteredUniforms.insert("WorldViewProjMatrix");
+
+        // Create material
+        m_shadowMapMaterial = std::make_shared<Material>(shaderProgramPtr, filteredUniforms);
+        m_shadowMapMaterial->SetCullMode(Material::CullMode::Front);
+    }
+
     // Load and build shader
     std::vector<const char*> vertexShaderPaths;
     vertexShaderPaths.push_back("shaders/version330.glsl");
@@ -209,12 +253,30 @@ void SceneViewerApplication::InitializeModels()
     //std::shared_ptr<Model> teaSetModel = loader.LoadShared("models/tea_set/tea_set.obj");
     //m_scene.AddSceneNode(std::make_shared<SceneModel>("tea set", teaSetModel));
 
-    //std::shared_ptr<Model> clockModel = loader.LoadShared("models/alarm_clock/alarm_clock.obj");
-    //m_scene.AddSceneNode(std::make_shared<SceneModel>("alarm clock", clockModel));
+    std::shared_ptr<Model> clockModel = loader.LoadShared("models/alarm_clock/alarm_clock.obj");
+    std::shared_ptr<SceneModel> clockSceneModel = std::make_shared<SceneModel>("alarm clock", clockModel);
+    clockSceneModel->GetTransform()->SetTranslation(glm::vec3(0.0f, 0.75f, 0.25f));
+    m_scene.AddSceneNode(clockSceneModel);
 }
 
 void SceneViewerApplication::InitializeRenderer()
 {
+    // Add shadow map pass
+    if (m_mainLight)
+    {
+        if (!m_mainLight->GetShadowMap())
+        {
+            // Set up shadow map configuration
+            m_mainLight->CreateShadowMap(glm::vec2(512, 512));
+            m_mainLight->SetShadowBias(0.001f);
+        }
+        std::unique_ptr<ShadowMapRenderPass> shadowMapRenderPass(std::make_unique<ShadowMapRenderPass>(m_mainLight, m_shadowMapMaterial));
+        // Set volume covered by the directional light. This is needed because the directional light affect everywhere, and we need to maximize the shadow map density
+        // For now, just a 6x6x6m cube around the center. Adjust if needed
+        shadowMapRenderPass->SetVolume(glm::vec3(-3.0f * m_mainLight->GetDirection()), glm::vec3(6.0f));
+        m_renderer.AddRenderPass(std::move(shadowMapRenderPass));
+    }
+
     m_renderer.AddRenderPass(std::make_unique<ForwardRenderPass>());
     m_renderer.AddRenderPass(std::make_unique<SkyboxRenderPass>(m_skyboxTexture));
 }

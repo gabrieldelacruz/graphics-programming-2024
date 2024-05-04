@@ -345,10 +345,13 @@ void PostFXSceneViewerApplication::InitializeRenderer()
     {
         if (!m_mainLight->GetShadowMap())
         {
+            // Set up shadow map configuration
             m_mainLight->CreateShadowMap(glm::vec2(512, 512));
             m_mainLight->SetShadowBias(0.001f);
         }
         std::unique_ptr<ShadowMapRenderPass> shadowMapRenderPass(std::make_unique<ShadowMapRenderPass>(m_mainLight, m_shadowMapMaterial));
+        // Set volume covered by the directional light. This is needed because the directional light affect everywhere, and we need to maximize the shadow map density
+        // For now, just a 6x6x6m cube around the center. Adjust if needed
         shadowMapRenderPass->SetVolume(glm::vec3(-3.0f * m_mainLight->GetDirection()), glm::vec3(6.0f));
         m_renderer.AddRenderPass(std::move(shadowMapRenderPass));
     }

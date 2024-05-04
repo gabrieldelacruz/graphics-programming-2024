@@ -9,6 +9,7 @@
 
 class TextureCubemapObject;
 class Material;
+class Light;
 
 class SceneViewerApplication : public Application
 {
@@ -43,9 +44,15 @@ private:
     // Renderer
     Renderer m_renderer;
 
+    // Main light
+    std::shared_ptr<Light> m_mainLight;
+
     // Skybox texture
     std::shared_ptr<TextureCubemapObject> m_skyboxTexture;
 
     // Default material
     std::shared_ptr<Material> m_defaultMaterial;
+
+    // Shadowmap material
+    std::shared_ptr<Material> m_shadowMapMaterial;
 };
