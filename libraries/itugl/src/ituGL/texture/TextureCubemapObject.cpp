@@ -13,7 +13,7 @@ void TextureCubemapObject::SetImage<std::byte>(GLint level, Face face, GLsizei s
     assert(data.empty() || type != Data::Type::None);
     assert(IsValidFormat(format, internalFormat));
     assert(data.empty() || data.size_bytes() == side * side * GetDataComponentCount(internalFormat) * Data::GetTypeSize(type));
-    glTexImage2D(static_cast<GLenum>(face), level, internalFormat, side, side, 0, format, static_cast<GLenum>(type), data.data());
+    glTexImage2D(static_cast<GLenum>(face), level, internalFormat, side, side, 0, format, type == Data::Type::None ? GL_BYTE : static_cast<GLenum>(type), data.data());
 }
 
 void TextureCubemapObject::SetImage(GLint level, GLsizei side, Format format, InternalFormat internalFormat)

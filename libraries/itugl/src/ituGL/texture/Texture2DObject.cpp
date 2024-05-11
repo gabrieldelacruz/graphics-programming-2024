@@ -13,7 +13,7 @@ void Texture2DObject::SetImage<std::byte>(GLint level, GLsizei width, GLsizei he
     assert(data.empty() || type != Data::Type::None);
     assert(IsValidFormat(format, internalFormat));
     assert(data.empty() || data.size_bytes() == width * height * GetDataComponentCount(internalFormat) * Data::GetTypeSize(type));
-    glTexImage2D(GetTarget(), level, internalFormat, width, height, 0, format, static_cast<GLenum>(type), data.data());
+    glTexImage2D(GetTarget(), level, internalFormat, width, height, 0, format, type == Data::Type::None ? GL_BYTE : static_cast<GLenum>(type), data.data());
 }
 
 void Texture2DObject::SetImage(GLint level, GLsizei width, GLsizei height, Format format, InternalFormat internalFormat)
