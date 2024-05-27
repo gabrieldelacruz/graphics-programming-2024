@@ -28,6 +28,7 @@ public:
 
     inline Data::Type GetType() const { return m_type; }
     inline int GetComponents() const { return m_components; }
+    inline bool IsFloatingPoint() const { return m_type == Data::Type::Float || m_type == Data::Type::Double || m_type == Data::Type::Half; }
     inline bool IsNormalized() const { return m_normalized; }
     inline Semantic GetSemantic() const { return m_semantic; }
 
